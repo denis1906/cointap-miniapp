@@ -29,7 +29,7 @@ async def cmd_start(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
             text="🪙 Играть",
-            web_app=WebAppInfo(url=f"{WEBAPP_URL}?api={API_URL}"),
+            web_app=WebAppInfo(url=WEBAPP_URL),
         )
     ]])
     await message.answer(

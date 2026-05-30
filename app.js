@@ -7,8 +7,15 @@ const tgUser = tg?.initDataUnsafe?.user;
 const USER_ID   = tgUser?.id        || 0;
 const USER_NAME = tgUser?.first_name || "Player";
 
-/* --- API URL из query-параметра (передаётся ботом) --- */
-const API_URL = new URLSearchParams(window.location.search).get("api") || "http://localhost:8080";
+/* --- API URL из config.json --- */
+let API_URL = "http://localhost:8080";
+async function loadConfig() {
+  try {
+    const res = await fetch("config.json");
+    const cfg = await res.json();
+    API_URL = cfg.api_url || API_URL;
+  } catch (e) {}
+}
 
 /* --- Состояние --- */
 let player = {
@@ -46,6 +53,7 @@ async function apiPost(path, body) {
 
 /* --- Загрузка игрока при старте --- */
 async function init() {
+  await loadConfig();
   try {
     const data = await apiGet(`/api/player?user_id=${USER_ID}&name=${encodeURIComponent(USER_NAME)}`);
     player = { ...player, ...data };
