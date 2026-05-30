@@ -20,20 +20,26 @@ def _get_conn():
 
 
 def init_db():
-    """Создаёт таблицу при первом запуске."""
+    """Создаёт таблицу при первом запуске, добавляет колонку total_clicks если нет."""
     with _get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS players (
-                    user_id       BIGINT PRIMARY KEY,
-                    name          VARCHAR(255) NOT NULL,
-                    coins         BIGINT  DEFAULT 0,
+                    user_id         BIGINT PRIMARY KEY,
+                    name            VARCHAR(255) NOT NULL,
+                    coins           BIGINT  DEFAULT 0,
                     coins_per_click INTEGER DEFAULT 1,
                     passive_per_sec INTEGER DEFAULT 0,
                     upgrade_double  BOOLEAN DEFAULT FALSE,
                     upgrade_triple  BOOLEAN DEFAULT FALSE,
-                    upgrade_auto    BOOLEAN DEFAULT FALSE
+                    upgrade_auto    BOOLEAN DEFAULT FALSE,
+                    total_clicks    BIGINT  DEFAULT 0
                 )
+            """)
+            # Миграция: добавляем колонку если таблица уже существует без неё
+            cur.execute("""
+                ALTER TABLE players
+                ADD COLUMN IF NOT EXISTS total_clicks BIGINT DEFAULT 0
             """)
         conn.commit()
 
@@ -45,6 +51,7 @@ def _row_to_player(row: dict) -> dict:
         "coins": row["coins"],
         "coins_per_click": row["coins_per_click"],
         "passive_per_sec": row["passive_per_sec"],
+        "total_clicks": row.get("total_clicks", 0),
         "upgrades": {
             "double": row["upgrade_double"],
             "triple": row["upgrade_triple"],
@@ -73,8 +80,11 @@ def _db_add_coins(user_id: int, count: int) -> dict:
     with _get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "UPDATE players SET coins = coins + (coins_per_click * %s) WHERE user_id = %s RETURNING *",
-                (count, user_id),
+                """UPDATE players
+                   SET coins = coins + (coins_per_click * %s),
+                       total_clicks = total_clicks + %s
+                   WHERE user_id = %s RETURNING *""",
+                (count, count, user_id),
             )
             row = cur.fetchone()
             conn.commit()
@@ -155,6 +165,7 @@ def _json_get_player(user_id: int, name: str) -> dict:
         player = {
             "user_id": user_id, "name": name,
             "coins": 0, "coins_per_click": 1, "passive_per_sec": 0,
+            "total_clicks": 0,
             "upgrades": {"double": False, "triple": False, "auto": False},
         }
         data[key] = player
@@ -166,6 +177,7 @@ def _json_add_coins(user_id: int, count: int) -> dict:
     data = _json_load()
     p = data[str(user_id)]
     p["coins"] += p["coins_per_click"] * count
+    p["total_clicks"] = p.get("total_clicks", 0) + count
     _json_save(data)
     return p
 
