@@ -41,6 +41,11 @@ def init_db():
                 ALTER TABLE players
                 ADD COLUMN IF NOT EXISTS total_clicks BIGINT DEFAULT 0
             """)
+            # Для существующих игроков: восстанавливаем total_clicks из coins
+            cur.execute("""
+                UPDATE players SET total_clicks = coins
+                WHERE total_clicks = 0 AND coins > 0
+            """)
         conn.commit()
 
 
