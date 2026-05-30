@@ -1,4 +1,5 @@
 import json
+import os
 from config import DATA_FILE, UPGRADES
 
 
@@ -11,6 +12,7 @@ def load() -> dict:
 
 
 def save(data: dict) -> None:
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
