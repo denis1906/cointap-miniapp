@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoinTap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Вкладка 1: Кликер -->
+  <div id="tab-clicker" class="tab active">
+    <div id="coins-display">
+      <span id="coins-value">0</span>
+      <span class="coins-label">монет</span>
+    </div>
+    <div id="cpc-display">+<span id="cpc-value">1</span> за клик</div>
+
+    <div id="coin-wrapper">
+      <canvas id="particles-canvas"></canvas>
+      <button id="coin-btn" aria-label="Нажать монету">
+        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="coinGrad" cx="40%" cy="35%">
+              <stop offset="0%"   stop-color="#ffe066"/>
+              <stop offset="60%"  stop-color="#f0a800"/>
+              <stop offset="100%" stop-color="#b07000"/>
+            </radialGradient>
+          </defs>
+          <circle cx="60" cy="60" r="56" fill="url(#coinGrad)" stroke="#b07000" stroke-width="3"/>
+          <circle cx="60" cy="60" r="46" fill="none" stroke="#ffe066" stroke-width="2" opacity="0.5"/>
+          <text x="60" y="75" text-anchor="middle" font-size="48"
+                font-family="Inter,sans-serif" font-weight="700"
+                fill="#7a4a00">C</text>
+        </svg>
+      </button>
+    </div>
+
+    <div id="passive-display" style="display:none">
+      ⚡ +<span id="passive-value">0</span>/сек
+    </div>
+  </div>
+
+  <!-- Вкладка 2: Магазин -->
+  <div id="tab-shop" class="tab">
+    <h2>Магазин улучшений</h2>
+    <div id="shop-list"></div>
+  </div>
+
+  <!-- Вкладка 3: Лидеры -->
+  <div id="tab-leaders" class="tab">
+    <h2>Таблица лидеров</h2>
+    <ol id="leaders-list"></ol>
+  </div>
+
+  <!-- Навигация -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-tab="clicker">🪙 Кликер</button>
+    <button class="nav-btn"        data-tab="shop">🛒 Магазин</button>
+    <button class="nav-btn"        data-tab="leaders">🏆 Лидеры</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
