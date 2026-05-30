@@ -6,10 +6,16 @@ from aiohttp import web
 from config import BOT_TOKEN, API_URL
 from handlers import router
 import server as api_server
+import storage
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
+
+    # Инициализация БД (создаём таблицу если нет)
+    if os.getenv("DATABASE_URL"):
+        storage.init_db()
+        logging.info("База данных инициализирована")
 
     # Запуск HTTP API сервера
     runner = web.AppRunner(api_server.app_web)
