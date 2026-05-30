@@ -2,6 +2,14 @@
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
+/* --- Пользователь --- */
+const tgUser = tg?.initDataUnsafe?.user;
+const USER_ID   = tgUser?.id        || 0;
+const USER_NAME = tgUser?.first_name || "Player";
+
+/* --- API URL из query-параметра (передаётся ботом) --- */
+const API_URL = new URLSearchParams(window.location.search).get("api") || "http://localhost:8080";
+
 /* --- Состояние --- */
 let player = {
   coins: 0,
@@ -16,32 +24,39 @@ const UPGRADES_CONFIG = [
   { id: "auto",   label: "Автокликер",  desc: "+1 монета в секунду",       price: 1000, icon: "🤖" },
 ];
 
-/* --- Отправка данных в бот --- */
-function sendAction(payload) {
-  if (tg) {
-    tg.sendData(JSON.stringify(payload));
+/* --- HTTP API --- */
+async function apiGet(path) {
+  const res = await fetch(`${API_URL}${path}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Ошибка сервера");
+  }
+  return res.json();
+}
+
+/* --- Загрузка игрока при старте --- */
+async function init() {
+  try {
+    const data = await apiGet(`/api/player?user_id=${USER_ID}&name=${encodeURIComponent(USER_NAME)}`);
+    player = { ...player, ...data };
+    updateUI();
+    startPassiveIfNeeded();
+  } catch (e) {
+    showToast("Нет связи с сервером");
   }
 }
 
-/* --- Приём ответов от бота --- */
-if (tg) {
-  tg.onEvent("message", (msg) => {
-    try {
-      const data = JSON.parse(msg.text);
-      if (data.type === "player") {
-        player = { ...player, ...data };
-        updateUI();
-        startPassiveIfNeeded();
-      } else if (data.type === "leaders") {
-        renderLeaders(data.top);
-      } else if (data.type === "error") {
-        showToast(data.msg);
-      }
-    } catch (e) {}
-  });
-}
-
-sendAction({ action: "init" });
+init();
 
 /* --- Кликер с батчингом --- */
 let pendingClicks = 0;
@@ -55,13 +70,22 @@ document.getElementById("coin-btn").addEventListener("click", (e) => {
   spawnPopup(e, player.coins_per_click);
 
   clearTimeout(flushTimer);
-  flushTimer = setTimeout(() => {
-    if (pendingClicks > 0) {
-      sendAction({ action: "click", count: pendingClicks });
-      pendingClicks = 0;
-    }
-  }, 300);
+  flushTimer = setTimeout(flushClicks, 300);
 });
+
+async function flushClicks() {
+  if (pendingClicks <= 0) return;
+  const count = pendingClicks;
+  pendingClicks = 0;
+  try {
+    const data = await apiPost("/api/click", { user_id: USER_ID, count });
+    player = { ...player, ...data };
+    updateUI();
+  } catch (e) {
+    // клики уже отражены в UI оптимистично — просто логируем
+    console.warn("flush error:", e);
+  }
+}
 
 /* --- Автокликер (пассивный доход на стороне UI) --- */
 let passiveInterval = null;
@@ -69,13 +93,17 @@ let passiveSyncCounter = 0;
 
 function startPassiveIfNeeded() {
   if (player.passive_per_sec > 0 && !passiveInterval) {
-    passiveInterval = setInterval(() => {
+    passiveInterval = setInterval(async () => {
       player.coins += player.passive_per_sec;
       updateCoinsDisplay();
       passiveSyncCounter++;
       if (passiveSyncCounter >= 5) {
-        sendAction({ action: "click", count: 5 });
         passiveSyncCounter = 0;
+        try {
+          const data = await apiPost("/api/click", { user_id: USER_ID, count: 5 });
+          player = { ...player, ...data };
+          updateUI();
+        } catch (e) {}
       }
     }, 1000);
   }
@@ -126,11 +154,29 @@ function renderShop() {
       </button>
     `;
     if (!owned && canAfford) {
-      card.querySelector(".buy-btn").addEventListener("click", () => {
-        sendAction({ action: "buy", upgrade: upg.id });
-      });
+      card.querySelector(".buy-btn").addEventListener("click", () => buyUpgrade(upg.id));
     }
     list.appendChild(card);
+  }
+}
+
+async function buyUpgrade(upgradeId) {
+  try {
+    const data = await apiPost("/api/buy", { user_id: USER_ID, upgrade: upgradeId });
+    player = { ...player, ...data };
+    updateUI();
+    startPassiveIfNeeded();
+  } catch (e) {
+    showToast(e.message || "Ошибка покупки");
+  }
+}
+
+async function loadLeaders() {
+  try {
+    const data = await apiGet("/api/leaders");
+    renderLeaders(data.top);
+  } catch (e) {
+    showToast("Не удалось загрузить лидеров");
   }
 }
 
@@ -228,11 +274,11 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
     document.getElementById(`tab-${tab}`).classList.add("active");
     btn.classList.add("active");
-    if (tab === "leaders") sendAction({ action: "leaders" });
+    if (tab === "leaders") loadLeaders();
   });
 });
 
 /* --- Утилиты --- */
 function escapeHtml(str) {
-  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
